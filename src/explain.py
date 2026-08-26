@@ -14,42 +14,75 @@ from train_model import (
 
 OPTIMAL_THRESHOLD = 0.19
 
+def format_feature_for_human(feature_name: str, feature_value: float) -> str:
+    """
+    Translates raw feature column names and values into unambiguous human-readable business terms.
+    Fixes the classic dummy-variable interpretability bug where dummy=0 (e.g. Prepaid=False -> COD)
+    is mislabeled in naive SHAP outputs.
+    """
+    if feature_name == "payment_method_Prepaid":
+        return "Payment Method: COD" if not bool(feature_value) else "Payment Method: Prepaid"
+    elif feature_name == "is_size_sensitive":
+        return "Size-Sensitive Category" if bool(feature_value) else "Non-Size-Sensitive Category"
+    elif feature_name == "customer_past_orders":
+        if int(feature_value) == 0:
+            return "First-Time Customer (0 past orders)"
+        return f"{int(feature_value)} past orders"
+    elif feature_name == "customer_past_return_rate":
+        return f"Historical Return Rate ({feature_value * 100:.1f}%)"
+    elif feature_name == "discount_pct":
+        return f"High Discount ({feature_value * 100:.0f}%)"
+    elif feature_name == "delivery_days":
+        return f"Long Delivery Time ({int(feature_value)} days)"
+    elif feature_name == "days_to_purchase":
+        if int(feature_value) <= 1:
+            return "Impulse Purchase (<= 1 day deliberation)"
+        return f"{int(feature_value)} days deliberation"
+    elif feature_name.startswith("category_"):
+        cat_name = feature_name.replace("category_", "")
+        return f"Category: {cat_name}" if bool(feature_value) else f"Category: Not {cat_name}"
+    elif feature_name.startswith("region_"):
+        region_name = feature_name.replace("region_", "")
+        return f"Region: {region_name}"
+    
+    return f"{feature_name.replace('_', ' ')} ({feature_value})"
+
 def generate_template_explanation(top_features: list[tuple[str, float]]) -> str:
-    """Fallback plain-English explanation generator using raw SHAP feature contributions."""
-    feature_names = [f[0].replace('_', ' ') for f in top_features]
-    if len(feature_names) == 3:
-        return f"High return risk driven primarily by {feature_names[0]}, {feature_names[1]}, and {feature_names[2]}."
-    elif len(feature_names) == 2:
-        return f"High return risk driven primarily by {feature_names[0]} and {feature_names[1]}."
-    elif len(feature_names) == 1:
-        return f"High return risk driven primarily by {feature_names[0]}."
+    """Fallback plain-English explanation generator using mapped business features."""
+    feature_descriptions = [f[0] for f in top_features]
+    if len(feature_descriptions) == 3:
+        return f"High return risk driven primarily by {feature_descriptions[0]}, {feature_descriptions[1]}, and {feature_descriptions[2]}."
+    elif len(feature_descriptions) == 2:
+        return f"High return risk driven primarily by {feature_descriptions[0]} and {feature_descriptions[1]}."
+    elif len(feature_descriptions) == 1:
+        return f"High return risk driven primarily by {feature_descriptions[0]}."
     return "High return risk detected based on historical order characteristics."
 
-def explain_with_llm(top_features: list[tuple[str, float]], api_key: str = None) -> str:
+def explain_with_llm(top_features: list[tuple[str, float]], api_key: str = None) -> tuple[str, str]:
     """
     Attempts to call Anthropic API (claude-sonnet-4-6) to turn top 3 SHAP features into a single concise sentence.
     Retries once on failure, then gracefully falls back to template explanation.
+    Returns tuple of (explanation_text, mode_used).
     """
     if not api_key:
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         
     if not api_key:
-        # No API key present -> immediate fallback to template
-        return generate_template_explanation(top_features)
+        # No API key present -> graceful template fallback
+        return generate_template_explanation(top_features), "Template Fallback (No API Key in Env)"
 
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
         
-        feature_desc = ", ".join([f"{name} (SHAP value: {val:+.3f})" for name, val in top_features])
+        feature_desc = ", ".join([f"{name} (SHAP contribution: {val:+.3f})" for name, val in top_features])
         prompt = (
-            f"You are an AI e-commerce risk analyst. Summarize the following top risk factors for an order into "
+            f"You are an AI e-commerce risk analyst for Razorpay. Summarize the following top risk factors for an order into "
             f"EXACTLY ONE professional, clear plain-English sentence for a merchant dashboard:\n"
             f"Risk factors: {feature_desc}\n"
             f"Output only the one sentence explanation without conversational filler."
         )
         
-        # Try once with retries
         for attempt in range(2):
             try:
                 response = client.messages.create(
@@ -58,26 +91,23 @@ def explain_with_llm(top_features: list[tuple[str, float]], api_key: str = None)
                     messages=[{"role": "user", "content": prompt}]
                 )
                 explanation = response.content[0].text.strip()
-                return explanation
+                return explanation, "Anthropic API (claude-sonnet-4-6)"
             except Exception as retry_err:
                 if attempt == 0:
-                    time.sleep(1) # wait 1s before retrying
+                    time.sleep(1)
                     continue
                 else:
-                    print(f"  [LLM API Warning] Anthropic API failed after retry ({retry_err}). Falling back to template explanation.")
-                    return generate_template_explanation(top_features)
+                    print(f"  [LLM API Warning] Anthropic API call failed after retry: {retry_err}")
+                    return generate_template_explanation(top_features), "Template Fallback (API Call Failed)"
                     
     except ImportError:
-        print("  [LLM API Warning] Anthropic SDK not found. Falling back to template explanation.")
-        return generate_template_explanation(top_features)
+        return generate_template_explanation(top_features), "Template Fallback (SDK Not Found)"
 
 def compute_shap_explanations(model, X_test: pd.DataFrame, threshold: float = OPTIMAL_THRESHOLD):
     """
     Runs SHAP explainer on high-risk flagged orders.
-    Returns top 3 contributing features per flagged order.
+    Maps one-hot dummy variables to true business meanings before generating explanations.
     """
-    # Create TreeExplainer on base LightGBM model
-    # CalibratedClassifierCV wraps estimator in calibrated_classifiers_
     if hasattr(model, 'calibrated_classifiers_'):
         base_estimator = model.calibrated_classifiers_[0].estimator
     else:
@@ -85,7 +115,6 @@ def compute_shap_explanations(model, X_test: pd.DataFrame, threshold: float = OP
         
     explainer = shap.TreeExplainer(base_estimator)
     
-    # Calculate probabilities
     probs = model.predict_proba(X_test)[:, 1]
     flagged_indices = np.where(probs >= threshold)[0]
     
@@ -97,34 +126,48 @@ def compute_shap_explanations(model, X_test: pd.DataFrame, threshold: float = OP
     X_flagged = X_test.iloc[flagged_indices]
     shap_values = explainer.shap_values(X_flagged)
     
-    # Handle single output array vs multi-class list output in SHAP
     if isinstance(shap_values, list):
-        shap_values = shap_values[1] # positive class
+        shap_values = shap_values[1]
         
     explanations_summary = []
     
     for i, idx in enumerate(flagged_indices):
         order_shap = shap_values[i]
+        order_row = X_flagged.iloc[i]
         feature_names = X_test.columns
         
         # Get top 3 positive contributing SHAP features
         top_3_idx = np.argsort(order_shap)[::-1][:3]
-        top_features = [(feature_names[j], float(order_shap[j])) for j in top_3_idx]
         
-        # Narrate explanation
-        narrative = explain_with_llm(top_features)
+        # Map raw feature + value to human business term
+        top_features = []
+        for j in top_3_idx:
+            raw_name = feature_names[j]
+            raw_val = order_row[raw_name]
+            human_term = format_feature_for_human(raw_name, raw_val)
+            shap_val = float(order_shap[j])
+            top_features.append((human_term, shap_val, raw_name, raw_val))
+        
+        # Format for narration
+        narration_features = [(tf[0], tf[1]) for tf in top_features]
+        narrative, mode = explain_with_llm(narration_features)
         
         explanations_summary.append({
             'test_index': idx,
             'risk_score': probs[idx],
             'top_features': top_features,
-            'narrative': narrative
+            'narrative': narrative,
+            'narration_mode': mode
         })
         
     return explanations_summary
 
 def main():
     print("=== Phase 6: Explainability Layer (SHAP + LLM Narration) ===")
+    
+    api_key_present = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    print(f"Anthropic API Key Status: {'PRESENT' if api_key_present else 'NOT SET (Operating in Fallback Template Mode)'}")
+    
     dataset_path = os.path.join("data", "synthetic_orders.csv")
     orders_df = load_orders_data(dataset_path)
     
@@ -149,8 +192,10 @@ def main():
     
     print("\n--- Sample Explanations (First 5 Flagged Orders) ---")
     for exp in explanations[:5]:
-        print(f"Order Index: {exp['test_index']} | Risk Score: {exp['risk_score']:.3f}")
-        print(f"  Top 3 SHAP Features: {exp['top_features']}")
+        print(f"Order Index: {exp['test_index']} | Risk Score: {exp['risk_score']:.3f} | Mode: {exp['narration_mode']}")
+        print("  Top 3 SHAP Features (Human-Mapped):")
+        for tf in exp['top_features']:
+            print(f"    - {tf[0]:<40} (Raw: {tf[2]}={tf[3]}, SHAP: {tf[1]:+.3f})")
         print(f"  Narrative: \"{exp['narrative']}\"\n")
         
     print("Phase 6 (Explainability Layer) complete.")

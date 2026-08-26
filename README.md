@@ -75,9 +75,17 @@ By sweeping thresholds from `0.00` to `1.00` on the calibrated test set probabil
 Rather than presenting raw probabilities or complex feature weight numbers to e-commerce merchants, our pipeline provides human-interpretable natural language explanations for every high-risk flag.
 
 1. **SHAP Feature Attribution:** For orders flagged high-risk at `threshold = 0.19`, `shap.TreeExplainer` computes exact local feature contributions.
-2. **Top-3 Feature Extraction:** The top 3 risk-increasing features for each order are isolated.
-3. **LLM Narration (`claude-sonnet-4-6`):** An Anthropic Claude model converts the raw feature attributions into a single, merchant-friendly sentence.
-4. **Resilient Fallback Handling:** If the LLM API call times out or fails rate-limits, the pipeline retries once before gracefully defaulting to a deterministic template-based explanation generator — guaranteeing zero production downtime.
+2. **One-Hot Dummy Interpretability Mapping:** Raw dummy variables (e.g. `payment_method_Prepaid = False`) are mapped to human business terms (`Payment Method: COD`) to prevent merchant confusion.
+3. **LLM Narration (`claude-sonnet-4-6`):** An Anthropic Claude model converts the mapped feature attributions into a single, merchant-friendly sentence.
+4. **Resilient Fallback Handling:** If `ANTHROPIC_API_KEY` is not present in the environment or if the API call times out / hits rate-limits, the pipeline retries once before gracefully defaulting to a deterministic template-based explanation generator — guaranteeing zero production downtime.
+
+### Interpretability Audit: Dummy Variable Mapping Fix
+
+> [!NOTE]
+> **Key Finding on `payment_method_Prepaid`:** During SHAP feature extraction, Order 3 showed a positive SHAP contribution (`+0.434`) associated with the column `payment_method_Prepaid`. 
+> - **Underlying Data:** Order 3 was placed via **Cash on Delivery (COD)**, so `payment_method_Prepaid = False`.
+> - **Model Reality:** In our synthetic data, COD orders carry higher return risk. Therefore, being **NOT Prepaid (COD)** correctly increased the model's return probability.
+> - **Human Translation:** A naive SHAP output would print `"payment_method_Prepaid"` as a risk driver, falsely implying prepaid orders are risky. Our pipeline intercepts dummy variables and maps `payment_method_Prepaid = False` to **`Payment Method: COD`**, presenting clear, accurate business context to merchants.
 
 ### Why LLMs Do NOT Compute Risk Scores Directly
 
