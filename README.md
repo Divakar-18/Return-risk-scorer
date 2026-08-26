@@ -69,5 +69,26 @@ By sweeping thresholds from `0.00` to `1.00` on the calibrated test set probabil
 
 ![Cost Curve](data/threshold_cost_curve.png)
 
+## Phase 6: Explainability Layer (SHAP + LLM Narration)
+
+### Explainability Architecture
+Rather than presenting raw probabilities or complex feature weight numbers to e-commerce merchants, our pipeline provides human-interpretable natural language explanations for every high-risk flag.
+
+1. **SHAP Feature Attribution:** For orders flagged high-risk at `threshold = 0.19`, `shap.TreeExplainer` computes exact local feature contributions.
+2. **Top-3 Feature Extraction:** The top 3 risk-increasing features for each order are isolated.
+3. **LLM Narration (`claude-sonnet-4-6`):** An Anthropic Claude model converts the raw feature attributions into a single, merchant-friendly sentence.
+4. **Resilient Fallback Handling:** If the LLM API call times out or fails rate-limits, the pipeline retries once before gracefully defaulting to a deterministic template-based explanation generator — guaranteeing zero production downtime.
+
+### Why LLMs Do NOT Compute Risk Scores Directly
+
+> [!IMPORTANT]
+> **Architectural Separation of Duties:** In a production risk scoring engine, LLMs should **NEVER** perform the quantitative probability scoring directly.
+
+1. **Poor Calibration & Hallucination:** LLMs produce non-calibrated, un-auditable outputs that cannot guarantee mathematically valid probability distributions (`[0.0, 1.0]`).
+2. **Lack of Held-Out Evaluation Guarantees:** ML models like LightGBM provide strict generalization guarantees verified on held-out temporal test sets. LLMs lack empirical loss-minimization guarantees on structured tabular data.
+3. **Latency & Cost Inefficiency:** Running a multi-billion parameter LLM for tabular probability estimation adds ~500ms–2000ms latency per transaction at 100x the cost of a lightweight LightGBM inference (<5ms).
+4. **Deterministic Auditing:** Financial regulators and fraud compliance teams require exact feature weights and reproducible score calculations, which non-deterministic LLM text generation cannot provide.
+
+
 
 
