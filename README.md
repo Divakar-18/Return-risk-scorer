@@ -12,3 +12,18 @@ Instead of accuracy, we rely on:
 - **Recall:** Of all the actual returns, what fraction did we successfully flag?
 - **F1-Score:** The harmonic mean of precision and recall.
 - **PR-AUC (Precision-Recall Area Under Curve):** A summary metric of the model's ability to trade off precision and recall across all possible thresholds, specifically suited for imbalanced datasets.
+
+## Phase 3: Main Model Choice & Cross-Validation
+
+### Why Gradient Boosted Decision Trees Win
+Logistic Regression assumes a linear decision boundary between input features and the log-odds of a return. However, real e-commerce return behavior relies heavily on **non-linear feature interactions**.
+
+For example:
+- A 50% discount on an `Electronics` item might indicate a great deal with a low return rate.
+- The exact same 50% discount on an `Apparel` item bought with 0 deliberation days (`days_to_purchase <= 1`) signals impulse buy behavior, resulting in a very high return rate.
+
+Tree-based ensemble models like **LightGBM** (and XGBoost) natively capture these non-linear interaction effects (`discount_pct × category` or `payment_method × customer_past_orders`) without requiring manual feature engineering.
+
+### Cross-Validation Strategy
+To avoid temporal data leakage (predicting past events using future patterns), we use a **5-Fold Time-Series Split (`TimeSeriesSplit`)** instead of standard random K-Fold cross-validation. This enforces an expanding window training scheme that accurately mimics real-world deployment.
+
