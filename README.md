@@ -97,6 +97,24 @@ Rather than presenting raw probabilities or complex feature weight numbers to e-
 3. **Latency & Cost Inefficiency:** Running a multi-billion parameter LLM for tabular probability estimation adds ~500ms–2000ms latency per transaction at 100x the cost of a lightweight LightGBM inference (<5ms).
 4. **Deterministic Auditing:** Financial regulators and fraud compliance teams require exact feature weights and reproducible score calculations, which non-deterministic LLM text generation cannot provide.
 
+## Phase 7: Failure Case #1 — Cold Start Vulnerability
+
+### Postmortem Analysis
+
+```text
+Expected  ---> Flag first-time COD orders for risk mitigation due to zero sunk customer cost.
+Happened  ---> Raw model returned probability = 0.114 for cold-start orders in lower-risk categories, passing them as LOW RISK.
+Diagnosis ---> The LightGBM model heavily relies on `customer_past_return_rate`. For first-time customers (`customer_past_orders == 0`), this feature defaults to 0.0, creating a false signal of safety.
+Fix       ---> Implemented a deterministic business rule override in `src/predict.py`: If `customer_past_orders == 0` AND `payment_method == 'COD'`, force decision to `MANUAL_REVIEW` regardless of model probability score.
+```
+
+### Empirical Traceability
+- **Test Order Payload:** `customer_past_orders = 0`, `payment_method = 'COD'`, `customer_past_return_rate = 0.0`.
+- **Raw Calibrated Model Score:** `0.114` (*Would have passed under standard threshold `0.19`*).
+- **Rule-Engine Output:** `MANUAL_REVIEW` (*Overridden by Cold-Start Guard*).
+- **Commit:** Implemented in `src/predict.py` and validated by unit test `tests/test_fallback_rules.py`.
+
+
 
 
 
