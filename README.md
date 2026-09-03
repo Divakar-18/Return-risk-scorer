@@ -78,10 +78,23 @@ Because missing a return (₹250) is **5x more expensive** than a false alarm (�
 
 ## 6. Explainability Layer & Architectural Rationale
 
-### SHAP + LLM Narration
+### SHAP + LLM Narration Architecture
 1. **SHAP Feature Attribution:** Computes exact local contributions for orders flagged high-risk at `threshold = 0.19`.
 2. **One-Hot Dummy Interpretability Mapping:** Maps boolean dummy states (e.g. `payment_method_Prepaid = False`) to clear business terms (`Payment Method: COD`) to fix raw SHAP label confusion.
 3. **LLM Narration (`claude-sonnet-4-6`):** Converts top-3 SHAP features into single-sentence merchant explanations, with automatic retry and template fallback.
+
+### Live LLM Narration vs. Deterministic Template Fallback (5 Sample Orders)
+
+| Order ID | Risk Score | Top 3 Mapped SHAP Drivers | Live LLM Narration (`claude-sonnet-4-6`) | Template Fallback Narration |
+| :--- | :--- | :--- | :--- | :--- |
+| **#1003** | `0.224` | 1. First-Time Customer (0 orders)<br>2. Payment Method: COD<br>3. Long Delivery (13 days) | *"This order poses elevated return risk because a first-time buyer chose Cash on Delivery with an extended 13-day delivery window."* | *"High return risk driven primarily by First-Time Customer (0 past orders), Payment Method: COD, and Long Delivery Time (13 days)."* |
+| **#1004** | `0.207` | 1. High Price (₹4,042)<br>2. First-Time Customer (0 orders)<br>3. Long Delivery (11 days) | *"Elevated return probability is driven by high item value purchased by an unverified first-time buyer with slow transit time."* | *"High return risk driven primarily by price (4042.21), First-Time Customer (0 past orders), and Long Delivery Time (11 days)."* |
+| **#1010** | `0.197` | 1. Size-Sensitive Category<br>2. Long Delivery (10 days)<br>3. Impulse Deliberation (<= 1 day) | *"Sizing uncertainty in apparel paired with rapid impulse buying and prolonged shipping substantially increases buyer's remorse risk."* | *"High return risk driven primarily by Size-Sensitive Category, Long Delivery Time (10 days), and Impulse Purchase (<= 1 day deliberation)."* |
+| **#1012** | `0.368` | 1. Past Return Rate (43.8%)<br>2. Long Delivery (14 days)<br>3. High Price (₹5,243) | *"Customer has a documented 43.8% historical return rate on expensive items, compounded by a maximum 14-day fulfillment duration."* | *"High return risk driven primarily by Historical Return Rate (43.8%), Long Delivery Time (14 days), and price (5243.92)."* |
+| **#1013** | `0.226` | 1. High Price (₹3,979)<br>2. Size-Sensitive Category<br>3. Long Delivery (10 days) | *"High-ticket apparel orders subject to extended delivery schedules exhibit significant sizing mismatch and cancellation risk."* | *"High return risk driven primarily by price (3979.45), Size-Sensitive Category, and Long Delivery Time (10 days)."* |
+
+> [!TIP]
+> **Why Live LLM is Superior for Merchants:** The deterministic template lists isolated variables, whereas Claude Sonnet synthesizes the *behavioral story* (e.g. recognizing that `size-sensitive` + `impulse purchase` = *buyer's remorse risk*). However, the template fallback guarantees 100% operational uptime if the API is unreachable.
 
 ### Why LLMs Do NOT Compute Risk Scores Directly
 > [!IMPORTANT]
