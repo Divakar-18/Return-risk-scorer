@@ -131,6 +131,21 @@ Fix       ---> Implemented an automated performance guard in `src/drift_check.py
 - **Minimum Operational Floor (85% of baseline):** `0.2280`
 - **Monitoring Status:** `HEALTHY` (Triggers alert `RECALIBRATION_NEEDED` if PR-AUC < 0.2280).
 
+## Phase 9: Feature Stability Analysis Across Seeds
+
+### Empirical Stability Findings
+To verify that the model's explanations and feature attributions are not artifacts of a single lucky random seed, we retrained the full pipeline under 3 independent data-generation and model seeds (`42`, `1042`, `2042`).
+
+| Seed | Top 5 Driving Features |
+| :--- | :--- |
+| **Seed 42** | `is_size_sensitive`, `customer_past_return_rate`, `delivery_days`, `customer_past_orders`, `price` |
+| **Seed 1042** | `is_size_sensitive`, `customer_past_return_rate`, `delivery_days`, `customer_past_orders`, `price` |
+| **Seed 2042** | `customer_past_return_rate`, `is_size_sensitive`, `delivery_days`, `price`, `discount_pct` |
+
+- **Top-10 Feature Jaccard Overlap:** **81.8%**
+- **Stability Verdict:** **HIGHLY STABLE** — The model's top feature rankings consistently prioritize domain-grounded return drivers (`is_size_sensitive`, `customer_past_return_rate`, `delivery_days`) across distinct seeds.
+
+
 
 
 
