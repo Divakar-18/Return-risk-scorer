@@ -88,7 +88,7 @@ def main():
 
     # 2. Fit Isotonic Calibration
     print("\nFitting Isotonic Calibrator on Validation Set...")
-    calibrated_iso = CalibratedClassifierCV(estimator=raw_model, method="isotonic", cv="prefit")
+    calibrated_iso = CalibratedClassifierCV(estimator=raw_model, method="isotonic", cv=3)
     calibrated_iso.fit(X_val, y_val)
     iso_val_probs = calibrated_iso.predict_proba(X_val)[:, 1]
     iso_test_probs = calibrated_iso.predict_proba(X_test)[:, 1]
@@ -96,7 +96,7 @@ def main():
 
     # 3. Fit Sigmoid (Platt Scaling) Calibrator on Validation Set
     print("\nFitting Sigmoid (Platt Scaling) Calibrator on Validation Set...")
-    calibrated_sig = CalibratedClassifierCV(estimator=raw_model, method="sigmoid", cv="prefit")
+    calibrated_sig = CalibratedClassifierCV(estimator=raw_model, method="sigmoid", cv=3)
     calibrated_sig.fit(X_val, y_val)
     sig_val_probs = calibrated_sig.predict_proba(X_val)[:, 1]
     sig_test_probs = calibrated_sig.predict_proba(X_test)[:, 1]
