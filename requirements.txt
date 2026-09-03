@@ -5,6 +5,7 @@ lightgbm==4.4.0
 xgboost==2.1.0
 shap==0.45.1
 anthropic==0.30.0
+openai==1.35.13
 pytest==8.2.2
 ruff==0.5.0
 matplotlib==3.9.0

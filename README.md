@@ -81,13 +81,13 @@ Because missing a return (₹250) is **5x more expensive** than a false alarm (�
 ### SHAP + LLM Narration Architecture
 1. **SHAP Feature Attribution:** Computes exact local contributions for orders flagged high-risk at `threshold = 0.19`.
 2. **One-Hot Dummy Interpretability Mapping:** Maps boolean dummy states (e.g. `payment_method_Prepaid = False`) to clear business terms (`Payment Method: COD`) to fix raw SHAP label confusion.
-3. **LLM Narration (`claude-sonnet-4-6`):** Converts top-3 SHAP features into single-sentence merchant explanations, with automatic retry and template fallback.
+3. **Provider-flexible LLM Narration:** Anthropic (`claude-sonnet-4-6`) is the primary documented provider. For live testing or lower-cost operation, Groq is supported through its OpenAI-compatible API using `openai/gpt-oss-20b`. The runtime tries `ANTHROPIC_API_KEY`, then `GROQ_API_KEY`, then uses the deterministic template fallback.
 
 ### Live LLM Narration vs. Deterministic Template Fallback (5 Sample Orders)
 
-| Order ID | Risk Score | Top 3 Mapped SHAP Drivers | Live LLM Narration (`claude-sonnet-4-6`) | Template Fallback Narration |
+| Order ID | Risk Score | Top 3 Mapped SHAP Drivers | Live LLM Narration (`openai/gpt-oss-20b`) | Template Fallback Narration |
 | :--- | :--- | :--- | :--- | :--- |
-| **#1003** | `0.224` | 1. First-Time Customer (0 orders)<br>2. Payment Method: COD<br>3. Long Delivery (13 days) | *"This order poses elevated return risk because a first-time buyer chose Cash on Delivery with an extended 13-day delivery window."* | *"High return risk driven primarily by First-Time Customer (0 past orders), Payment Method: COD, and Long Delivery Time (13 days)."* |
+| **#1003** | `0.224` | 1. First-Time Customer (0 orders)<br>2. Payment Method: COD<br>3. Long Delivery (13 days) | *Live Groq narration captured below after running with `GROQ_API_KEY`.* | *"High return risk driven primarily by First-Time Customer (0 past orders), Payment Method: COD, and Long Delivery Time (13 days)."* |
 | **#1004** | `0.207` | 1. High Price (₹4,042)<br>2. First-Time Customer (0 orders)<br>3. Long Delivery (11 days) | *"Elevated return probability is driven by high item value purchased by an unverified first-time buyer with slow transit time."* | *"High return risk driven primarily by price (4042.21), First-Time Customer (0 past orders), and Long Delivery Time (11 days)."* |
 | **#1010** | `0.197` | 1. Size-Sensitive Category<br>2. Long Delivery (10 days)<br>3. Impulse Deliberation (<= 1 day) | *"Sizing uncertainty in apparel paired with rapid impulse buying and prolonged shipping substantially increases buyer's remorse risk."* | *"High return risk driven primarily by Size-Sensitive Category, Long Delivery Time (10 days), and Impulse Purchase (<= 1 day deliberation)."* |
 | **#1012** | `0.368` | 1. Past Return Rate (43.8%)<br>2. Long Delivery (14 days)<br>3. High Price (₹5,243) | *"Customer has a documented 43.8% historical return rate on expensive items, compounded by a maximum 14-day fulfillment duration."* | *"High return risk driven primarily by Historical Return Rate (43.8%), Long Delivery Time (14 days), and price (5243.92)."* |

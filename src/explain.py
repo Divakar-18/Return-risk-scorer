@@ -60,49 +60,57 @@ def generate_template_explanation(top_features: list[tuple[str, float]]) -> str:
     return "High return risk detected based on historical order characteristics."
 
 def explain_with_llm(top_features: list[tuple[str, float]], api_key: str | None = None) -> tuple[str, str]:
-    """
-    Attempts to call Anthropic API (claude-sonnet-4-6) to turn top 3 SHAP features into a single concise sentence.
-    Retries once on failure, then gracefully falls back to template explanation.
-    Returns tuple of (explanation_text, mode_used).
-    """
-    if not api_key:
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-        
-    if not api_key:
-        # No API key present -> graceful template fallback
-        return generate_template_explanation(top_features), "Template Fallback (No API Key in Env)"
+    """Generate narration using Anthropic first, Groq second, or a local template."""
+    feature_desc = ", ".join([f"{name} (SHAP contribution: {val:+.3f})" for name, val in top_features])
+    prompt = (
+        f"You are an AI e-commerce risk analyst for Razorpay. Summarize the following top risk factors for an order into "
+        f"EXACTLY ONE professional, clear plain-English sentence for a merchant dashboard:\n"
+        f"Risk factors: {feature_desc}\n"
+        f"Output only the one sentence explanation without conversational filler."
+    )
 
-    try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
-        
-        feature_desc = ", ".join([f"{name} (SHAP contribution: {val:+.3f})" for name, val in top_features])
-        prompt = (
-            f"You are an AI e-commerce risk analyst for Razorpay. Summarize the following top risk factors for an order into "
-            f"EXACTLY ONE professional, clear plain-English sentence for a merchant dashboard:\n"
-            f"Risk factors: {feature_desc}\n"
-            f"Output only the one sentence explanation without conversational filler."
-        )
-        
-        for attempt in range(2):
-            try:
-                response = client.messages.create(
-                    model="claude-sonnet-4-6",
-                    max_tokens=100,
-                    messages=[{"role": "user", "content": prompt}]
-                )
-                explanation = response.content[0].text.strip()
-                return explanation, "Anthropic API (claude-sonnet-4-6)"
-            except Exception as retry_err:  # noqa: BLE001
-                if attempt == 0:
-                    time.sleep(1)
-                    continue
-                else:
-                    print(f"  [LLM API Warning] Anthropic API call failed after retry: {retry_err}")
-                    return generate_template_explanation(top_features), "Template Fallback (API Call Failed)"
-                    
-    except ImportError:
-        return generate_template_explanation(top_features), "Template Fallback (SDK Not Found)"
+    anthropic_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+    groq_key = os.environ.get("GROQ_API_KEY")
+
+    if anthropic_key:
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=anthropic_key)
+            for attempt in range(2):
+                try:
+                    response = client.messages.create(
+                        model="claude-sonnet-4-6",
+                        max_tokens=100,
+                        messages=[{"role": "user", "content": prompt}]
+                    )
+                    return response.content[0].text.strip(), "Anthropic API (claude-sonnet-4-6)"
+                except Exception as retry_err:  # noqa: BLE001
+                    if attempt == 0:
+                        time.sleep(1)
+                    else:
+                        print(f"  [LLM API Warning] Anthropic API call failed after retry: {retry_err}")
+        except ImportError:
+            print("  [LLM API Warning] Anthropic SDK not found; trying Groq.")
+        except Exception as anthropic_err:  # noqa: BLE001
+            print(f"  [LLM API Warning] Anthropic setup failed: {anthropic_err}")
+
+    if groq_key:
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=groq_key, base_url="https://api.groq.com/openai/v1")
+            response = client.chat.completions.create(
+                model="openai/gpt-oss-20b",
+                max_tokens=100,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            return response.choices[0].message.content.strip(), "Groq API (openai/gpt-oss-20b)"
+        except ImportError:
+            print("  [LLM API Warning] OpenAI SDK not found; using template fallback.")
+        except Exception as groq_err:  # noqa: BLE001
+            print(f"  [LLM API Warning] Groq API call failed: {groq_err}")
+
+    fallback_mode = "Template Fallback (No API Key in Env)" if not (anthropic_key or groq_key) else "Template Fallback (API Calls Failed)"
+    return generate_template_explanation(top_features), fallback_mode
 
 def compute_shap_explanations(model, X_test: pd.DataFrame, threshold: float = OPTIMAL_THRESHOLD):
     """
@@ -166,8 +174,10 @@ def compute_shap_explanations(model, X_test: pd.DataFrame, threshold: float = OP
 def main():
     print("=== Phase 6: Explainability Layer (SHAP + LLM Narration) ===")
     
-    api_key_present = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    print(f"Anthropic API Key Status: {'PRESENT' if api_key_present else 'NOT SET (Operating in Fallback Template Mode)'}")
+    anthropic_key_present = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    groq_key_present = bool(os.environ.get("GROQ_API_KEY"))
+    print(f"Anthropic API Key Status: {'PRESENT' if anthropic_key_present else 'NOT SET'}")
+    print(f"Groq API Key Status: {'PRESENT' if groq_key_present else 'NOT SET'}")
     
     dataset_path = os.path.join("data", "synthetic_orders.csv")
     orders_df = load_orders_data(dataset_path)
