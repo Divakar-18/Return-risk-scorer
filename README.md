@@ -114,6 +114,24 @@ Fix       ---> Implemented a deterministic business rule override in `src/predic
 - **Rule-Engine Output:** `MANUAL_REVIEW` (*Overridden by Cold-Start Guard*).
 - **Commit:** Implemented in `src/predict.py` and validated by unit test `tests/test_fallback_rules.py`.
 
+## Phase 8: Failure Case #2 — Concept Drift Monitoring
+
+### Postmortem Analysis
+
+```text
+Expected  ---> Maintain model performance (PR-AUC ~0.28+) across rolling operational time windows.
+Happened  ---> Performance slightly degraded from Early Validation Window (PR-AUC: 0.2682) to Late Window (PR-AUC: 0.2628), with potential for severe drop during real-world customer shifts.
+Diagnosis ---> In e-commerce, customer return behavior shifts seasonally (e.g. festive sales, policy changes). Serving stale predictions without performance monitoring causes silent revenue leakage.
+Fix       ---> Implemented an automated performance guard in `src/drift_check.py`: Evaluates rolling recent window PR-AUC against a baseline floor (85% of validation PR-AUC). Flags `RECALIBRATION_NEEDED` when PR-AUC drops below floor.
+```
+
+### Empirical Monitoring Results
+- **Early Validation Window PR-AUC:** `0.2682`
+- **Late Recent Window PR-AUC:** `0.2628` (-0.0054 performance delta)
+- **Minimum Operational Floor (85% of baseline):** `0.2280`
+- **Monitoring Status:** `HEALTHY` (Triggers alert `RECALIBRATION_NEEDED` if PR-AUC < 0.2280).
+
+
 
 
 
