@@ -1,8 +1,10 @@
+import argparse
 import os
+from datetime import datetime, timedelta, timezone
+
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
-import argparse
+
 
 def generate_synthetic_data(seed: int, num_samples: int = 4000) -> pd.DataFrame:
     """
@@ -27,7 +29,7 @@ def generate_synthetic_data(seed: int, num_samples: int = 4000) -> pd.DataFrame:
     order_id = np.arange(1, num_samples + 1)
     
     # Dates spanning 6 months
-    start_date = datetime(2023, 1, 1)
+    start_date = datetime(2023, 1, 1, tzinfo=timezone.utc)
     date_offsets = np.random.randint(0, 180, num_samples)
     order_date = [start_date + timedelta(days=int(d)) for d in date_offsets]
     
@@ -134,7 +136,7 @@ def main():
         print(f"Warning: Output directory '{output_dir}' does not exist. Creating it now.")
         try:
             os.makedirs(output_dir)
-        except Exception as e:
+        except OSError as e:
             print(f"ERROR: Failed to create output directory '{output_dir}'.")
             print(f"Exception: {e}")
             raise SystemExit(1)
@@ -156,7 +158,7 @@ def main():
         try:
             df.to_csv(filepath, index=False)
             print(f"  Saved to {filepath}")
-        except Exception as e:
+        except OSError as e:
             print(f"ERROR: Failed to save data to '{filepath}'.")
             print(f"Exception: {e}")
             raise SystemExit(1)

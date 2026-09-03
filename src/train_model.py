@@ -1,11 +1,18 @@
 import os
+
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (
+    average_precision_score,
+    f1_score,
+    precision_score,
+    recall_score,
+)
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import precision_score, recall_score, f1_score, average_precision_score
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+
 
 def load_orders_data(filepath: str) -> pd.DataFrame:
     """Loads the dataset, guarding against missing files."""

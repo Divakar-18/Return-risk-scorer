@@ -1,14 +1,14 @@
 import os
+
 import numpy as np
-import pandas as pd
 import shap
 from sklearn.calibration import CalibratedClassifierCV
 
 from train_model import (
+    get_chronological_split_indices,
+    get_gradient_boosting_model,
     load_orders_data,
     prepare_order_features,
-    get_chronological_split_indices,
-    get_gradient_boosting_model
 )
 
 SEEDS = [42, 1042, 2042]

@@ -1,14 +1,14 @@
 import os
+
 import numpy as np
-import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.metrics import average_precision_score
 
 from train_model import (
+    get_chronological_split_indices,
+    get_gradient_boosting_model,
     load_orders_data,
     prepare_order_features,
-    get_chronological_split_indices,
-    get_gradient_boosting_model
 )
 
 PR_AUC_FLOOR_PERCENTAGE = 0.85  # Flag recalibration if recent window PR-AUC drops > 15% from validation baseline

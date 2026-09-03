@@ -1,13 +1,14 @@
 import os
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
 
 from train_model import (
+    get_chronological_split_indices,
+    get_gradient_boosting_model,
     load_orders_data,
     prepare_order_features,
-    get_chronological_split_indices,
-    get_gradient_boosting_model
 )
 
 OPTIMAL_THRESHOLD = 0.19
@@ -21,11 +22,25 @@ def evaluate_order_risk(order_dict: dict, calibrated_model, feature_columns: lis
     overly optimistic score. Any first-time customer placing a Cash-on-Delivery (COD) order 
     is automatically routed to 'Manual Review' rather than blindly trusted.
     """
-    # Create DataFrame for single order
-    order_df = pd.DataFrame([order_dict])
+    # Ensure optional categorical columns exist in order_dict with defaults
+    default_order = {
+        'category': 'Apparel',
+        'payment_method': 'COD',
+        'region': 'North',
+        'is_size_sensitive': 1,
+        'price': 1000.0,
+        'discount_pct': 0.0,
+        'customer_past_orders': 0,
+        'customer_past_return_rate': 0.0,
+        'delivery_days': 5,
+        'days_to_purchase': 2
+    }
+    merged_order = {**default_order, **order_dict}
+    order_df = pd.DataFrame([merged_order])
     
-    # One-hot encode matching training features
-    encoded_df = pd.get_dummies(order_df, columns=['category', 'payment_method', 'region'])
+    # Identify present categorical columns to encode
+    cat_cols = [c for c in ['category', 'payment_method', 'region'] if c in order_df.columns]
+    encoded_df = pd.get_dummies(order_df, columns=cat_cols)
     
     # Reindex columns to match feature matrix exactly
     for col in feature_columns:
@@ -34,7 +49,8 @@ def evaluate_order_risk(order_dict: dict, calibrated_model, feature_columns: lis
     encoded_df = encoded_df[feature_columns]
     
     # Model probability
-    model_prob = float(calibrated_model.predict_proba(encoded_df)[:, 1][0])
+    probs_array = np.asarray(calibrated_model.predict_proba(encoded_df))
+    model_prob = float(probs_array[:, 1][0])
     
     # Apply Business Fallback Rule (Cold Start Guard)
     is_cold_start = (order_dict.get('customer_past_orders', 0) == 0)
@@ -64,7 +80,7 @@ def main():
     orders_df = load_orders_data(dataset_path)
     
     feature_matrix, target_vector = prepare_order_features(orders_df)
-    train_idx, test_idx = get_chronological_split_indices(orders_df)
+    train_idx, _test_idx = get_chronological_split_indices(orders_df)
     
     X_train = feature_matrix.iloc[train_idx]
     y_train = target_vector.iloc[train_idx]

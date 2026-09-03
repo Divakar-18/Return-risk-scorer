@@ -1,15 +1,16 @@
 import os
 import time
+
 import numpy as np
 import pandas as pd
 import shap
 from sklearn.calibration import CalibratedClassifierCV
 
 from train_model import (
+    get_chronological_split_indices,
+    get_gradient_boosting_model,
     load_orders_data,
     prepare_order_features,
-    get_chronological_split_indices,
-    get_gradient_boosting_model
 )
 
 OPTIMAL_THRESHOLD = 0.19
@@ -58,7 +59,7 @@ def generate_template_explanation(top_features: list[tuple[str, float]]) -> str:
         return f"High return risk driven primarily by {feature_descriptions[0]}."
     return "High return risk detected based on historical order characteristics."
 
-def explain_with_llm(top_features: list[tuple[str, float]], api_key: str = None) -> tuple[str, str]:
+def explain_with_llm(top_features: list[tuple[str, float]], api_key: str | None = None) -> tuple[str, str]:
     """
     Attempts to call Anthropic API (claude-sonnet-4-6) to turn top 3 SHAP features into a single concise sentence.
     Retries once on failure, then gracefully falls back to template explanation.
@@ -92,7 +93,7 @@ def explain_with_llm(top_features: list[tuple[str, float]], api_key: str = None)
                 )
                 explanation = response.content[0].text.strip()
                 return explanation, "Anthropic API (claude-sonnet-4-6)"
-            except Exception as retry_err:
+            except Exception as retry_err:  # noqa: BLE001
                 if attempt == 0:
                     time.sleep(1)
                     continue
@@ -175,7 +176,7 @@ def main():
     train_idx, test_idx = get_chronological_split_indices(orders_df)
     
     X_train, X_test = feature_matrix.iloc[train_idx], feature_matrix.iloc[test_idx]
-    y_train, y_test = target_vector.iloc[train_idx], target_vector.iloc[test_idx]
+    y_train, _y_test = target_vector.iloc[train_idx], target_vector.iloc[test_idx]
     
     pos_count = np.sum(y_train == 1)
     neg_count = np.sum(y_train == 0)

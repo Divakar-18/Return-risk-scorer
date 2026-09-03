@@ -1,9 +1,10 @@
 import os
+
 import matplotlib
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV, calibration_curve
 from sklearn.metrics import brier_score_loss, log_loss
 
@@ -77,13 +78,13 @@ def main():
     pos_weight = neg_count / max(1, pos_count)
 
     # 1. Fit Base Raw LightGBM Model
-    raw_model, model_name = get_gradient_boosting_model(scale_pos_weight=pos_weight)
+    raw_model, _model_name = get_gradient_boosting_model(scale_pos_weight=pos_weight)
     raw_model.fit(X_train_base, y_train_base)
     raw_val_probs = raw_model.predict_proba(X_val)[:, 1]
     raw_test_probs = raw_model.predict_proba(X_test)[:, 1]
 
     print("\nEvaluating Base Model Calibration on Validation Set...")
-    brier_raw, _ = evaluate_calibration(y_val, raw_val_probs, "Raw LightGBM")
+    _brier_raw, _ = evaluate_calibration(y_val, raw_val_probs, "Raw LightGBM")
 
     # 2. Fit Isotonic Calibration
     print("\nFitting Isotonic Calibrator on Validation Set...")
@@ -93,7 +94,7 @@ def main():
     iso_test_probs = calibrated_iso.predict_proba(X_test)[:, 1]
     brier_iso, _ = evaluate_calibration(y_val, iso_val_probs, "Isotonic Calibration")
 
-    # 3. Fit Sigmoid (Platt) Calibration
+    # 3. Fit Sigmoid (Platt Scaling) Calibrator on Validation Set
     print("\nFitting Sigmoid (Platt Scaling) Calibrator on Validation Set...")
     calibrated_sig = CalibratedClassifierCV(estimator=raw_model, method="sigmoid", cv="prefit")
     calibrated_sig.fit(X_val, y_val)
@@ -104,10 +105,8 @@ def main():
     # Pick the best performing calibrator based on Brier Score Loss on validation set
     if brier_iso < brier_sig:
         best_method = "Isotonic"
-        best_calibrated_model = calibrated_iso
     else:
         best_method = "Sigmoid"
-        best_calibrated_model = calibrated_sig
 
     print(f"\nSelection: {best_method} Calibration performed better on validation data (Lower Brier Score).")
 
