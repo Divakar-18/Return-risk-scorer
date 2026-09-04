@@ -107,16 +107,17 @@ st.markdown(
         border-radius: 6px;
         padding: 2rem 2rem 1.75rem;
         margin-top: 2rem;
-        color: var(--text);
+        background-color: #ffffff !important;
+        color: var(--text) !important;
     }
     .risk-card h3 {
         margin: 0 0 2rem;
-        color: var(--accent);
+        color: var(--accent) !important;
         font-size: 1.1rem;
         font-weight: 600;
     }
     .risk-card p {
-        color: var(--text);
+        color: var(--text) !important;
         font-weight: 400;
         margin: 1.25rem 0 0;
     }
@@ -127,13 +128,13 @@ st.markdown(
         margin-top: 1.75rem;
     }
     .risk-card small {
-        color: var(--muted);
+        color: var(--muted) !important;
         display: block;
         font-size: 0.8rem;
         margin-top: 1.5rem;
     }
     .risk-score {
-        color: var(--text);
+        color: var(--text) !important;
         font-size: 3.25rem;
         font-weight: 700;
         line-height: 1;
@@ -143,20 +144,21 @@ st.markdown(
         display: inline-block;
         border: 1px solid;
         border-radius: 4px;
+        color: var(--text) !important;
         font-size: 0.85rem;
         font-weight: 500;
         padding: 0.25rem 0.55rem;
     }
-    .decision-approve { border-color: var(--approve); color: var(--approve); }
-    .decision-review, .decision-flag { border-color: var(--danger); color: var(--danger); }
+    .decision-approve { border-color: var(--approve); color: var(--approve) !important; }
+    .decision-review, .decision-flag { border-color: var(--danger); color: var(--danger) !important; }
     .assessment-label {
-        color: var(--muted);
+        color: var(--muted) !important;
         font-size: 0.85rem;
         font-weight: 400;
         margin: 0;
     }
     .detail-label {
-        color: var(--muted);
+        color: var(--muted) !important;
         font-size: 0.85rem;
         font-weight: 500;
     }
@@ -166,6 +168,7 @@ st.markdown(
 )
 st.title("Return Risk Scorer")
 st.caption(f"Calibrated model with cold-start protection | Threshold: {OPTIMAL_THRESHOLD:.2f}")
+st.image("data/architecture_diagram.png", use_container_width=True)
 
 with st.form("order_risk_form"):
     category = st.selectbox("Category", ["Apparel", "Beauty", "Electronics", "Footwear", "Home"])
