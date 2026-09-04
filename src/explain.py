@@ -99,11 +99,14 @@ def explain_with_llm(top_features: list[tuple[str, float]], api_key: str | None 
             from openai import OpenAI
             client = OpenAI(api_key=groq_key, base_url="https://api.groq.com/openai/v1")
             response = client.chat.completions.create(
-                model="openai/gpt-oss-20b",
+                model="groq/compound-mini",
                 max_tokens=100,
                 messages=[{"role": "user", "content": prompt}]
             )
-            return response.choices[0].message.content.strip(), "Groq API (openai/gpt-oss-20b)"
+            content = response.choices[0].message.content
+            if not content:
+                raise ValueError("Groq response contained no message content")
+            return content.strip(), "Groq API (groq/compound-mini)"
         except ImportError:
             print("  [LLM API Warning] OpenAI SDK not found; using template fallback.")
         except Exception as groq_err:  # noqa: BLE001

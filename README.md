@@ -2,6 +2,8 @@
 
 A rigorous, defensible, cost-sensitive machine learning MVP designed to score e-commerce return risk, calibrate probability outputs, optimize financial decision thresholds, explain high-risk flags in plain English, and enforce robust operational failure guards.
 
+![Return-risk scoring architecture](data/architecture_diagram.png)
+
 ---
 
 ## 1. Problem Statement

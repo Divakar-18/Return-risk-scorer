@@ -1,0 +1,220 @@
+import os
+import sys
+from html import escape
+
+import numpy as np
+import pandas as pd
+import shap
+import streamlit as st
+from sklearn.calibration import CalibratedClassifierCV
+
+sys.path.insert(0, os.path.dirname(__file__))
+
+from explain import explain_with_llm, format_feature_for_human  # noqa: E402
+from predict import evaluate_order_risk  # noqa: E402
+from train_model import (  # noqa: E402
+    get_chronological_split_indices,
+    get_gradient_boosting_model,
+    load_orders_data,
+    prepare_order_features,
+)
+
+
+OPTIMAL_THRESHOLD = 0.19
+DATASET_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "synthetic_orders.csv")
+
+
+@st.cache_resource
+def load_calibrated_pipeline():
+    orders_df = load_orders_data(DATASET_PATH)
+    feature_matrix, target_vector = prepare_order_features(orders_df)
+    train_idx, _test_idx = get_chronological_split_indices(orders_df)
+    X_train = feature_matrix.iloc[train_idx]
+    y_train = target_vector.iloc[train_idx]
+    pos_weight = np.sum(y_train == 0) / max(1, np.sum(y_train == 1))
+    base_model, _model_name = get_gradient_boosting_model(scale_pos_weight=pos_weight)
+    calibrated_model = CalibratedClassifierCV(
+        estimator=base_model, method="isotonic", cv=5
+    )
+    calibrated_model.fit(X_train, y_train)
+    return calibrated_model, feature_matrix.columns.tolist()
+
+
+def get_shap_features(calibrated_model, order: dict, feature_columns: list[str]):
+    order_df = pd.DataFrame([order])
+    encoded_order = pd.get_dummies(
+        order_df, columns=["category", "payment_method", "region"]
+    )
+    for column in feature_columns:
+        if column not in encoded_order:
+            encoded_order[column] = 0
+    encoded_order = encoded_order[feature_columns]
+
+    base_estimator = calibrated_model.calibrated_classifiers_[0].estimator
+    shap_values = shap.TreeExplainer(base_estimator).shap_values(encoded_order)
+    if isinstance(shap_values, list):
+        shap_values = shap_values[1]
+
+    values = shap_values[0]
+    top_indices = np.argsort(values)[::-1][:3]
+    return [
+        (
+            format_feature_for_human(feature_columns[index], encoded_order.iloc[0, index]),
+            float(values[index]),
+        )
+        for index in top_indices
+    ]
+
+
+st.set_page_config(page_title="Return Risk Scorer", page_icon="R", layout="centered")
+st.markdown(
+    """
+    <style>
+    :root {
+        --primary: #1769aa;
+        --danger: #c0392b;
+        --neutral: #263746;
+    }
+    [data-testid="stHeading"] h1,
+    [data-testid="stHeading"] h2,
+    [data-testid="stHeading"] h3 {
+        color: var(--primary);
+    }
+    [data-testid="stForm"] {
+        border: 1px solid var(--neutral);
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(38, 55, 70, 0.12);
+        padding: 1.25rem 1.5rem 1rem;
+    }
+    [data-testid="stForm"] label {
+        color: var(--neutral);
+    }
+    [data-testid="stForm"] button[kind="primary"] {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #ffffff;
+        margin-top: 0.75rem;
+    }
+    .risk-card {
+        border: 1px solid var(--neutral);
+        border-radius: 8px;
+        padding: 1.25rem 1.5rem;
+        margin-top: 1rem;
+        box-shadow: 0 2px 10px rgba(38, 55, 70, 0.12);
+        color: var(--neutral);
+    }
+    .risk-card h3 {
+        margin: 0 0 1.25rem;
+        color: var(--primary);
+        font-size: 1.2rem;
+    }
+    .risk-card p {
+        color: var(--neutral);
+        margin: 0.9rem 0 0;
+    }
+    .risk-card .risk-score + .assessment-label {
+        margin-top: 1.25rem;
+    }
+    .risk-card .decision-badge + p {
+        margin-top: 1.25rem;
+    }
+    .risk-card small {
+        color: var(--neutral);
+        display: block;
+        margin-top: 1.1rem;
+        opacity: 0.72;
+    }
+    .risk-score {
+        color: var(--neutral);
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1.1;
+    }
+    .decision-badge {
+        display: inline-block;
+        border-radius: 5px;
+        color: #ffffff;
+        font-weight: 700;
+        padding: 0.35rem 0.65rem;
+        letter-spacing: 0.02em;
+    }
+    .decision-approve { background: var(--primary); }
+    .decision-review, .decision-flag { background: var(--danger); }
+    .assessment-label {
+        color: var(--neutral);
+        font-size: 0.85rem;
+        font-weight: 400;
+        margin: 0;
+        opacity: 0.72;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+st.title("Return Risk Scorer")
+st.caption(f"Calibrated model with cold-start protection | Threshold: {OPTIMAL_THRESHOLD:.2f}")
+
+with st.form("order_risk_form"):
+    category = st.selectbox("Category", ["Apparel", "Beauty", "Electronics", "Footwear", "Home"])
+    price = st.number_input("Price", min_value=0.0, value=1000.0, step=50.0)
+    discount_pct = st.number_input(
+        "Discount (%)", min_value=0.0, max_value=100.0, value=0.0, step=1.0
+    ) / 100
+    customer_past_orders = st.number_input(
+        "Customer past orders", min_value=0, value=0, step=1
+    )
+    customer_past_return_rate = st.number_input(
+        "Customer past return rate (%)", min_value=0.0, max_value=100.0, value=0.0, step=1.0
+    ) / 100
+    payment_method = st.selectbox("Payment method", ["COD", "Prepaid"])
+    delivery_days = st.number_input("Delivery days", min_value=1, value=5, step=1)
+    days_to_purchase = st.number_input("Days to purchase", min_value=0, value=2, step=1)
+    submitted = st.form_submit_button("Score order", type="primary")
+
+if submitted:
+    with st.spinner("Loading model and scoring order..."):
+        calibrated_model, feature_columns = load_calibrated_pipeline()
+        order = {
+            "category": category,
+            "is_size_sensitive": int(category in {"Apparel", "Footwear"}),
+            "price": price,
+            "discount_pct": discount_pct,
+            "customer_past_orders": customer_past_orders,
+            "customer_past_return_rate": customer_past_return_rate,
+            "payment_method": payment_method,
+            "region": "North",
+            "delivery_days": delivery_days,
+            "days_to_purchase": days_to_purchase,
+        }
+        result = evaluate_order_risk(order, calibrated_model, feature_columns)
+        shap_features = get_shap_features(calibrated_model, order, feature_columns)
+        narrative, narration_mode = explain_with_llm(shap_features)
+
+    decision_map = {
+        "PASS_LOW_RISK": "APPROVE",
+        "MANUAL_REVIEW": "MANUAL_REVIEW",
+        "FLAG_HIGH_RISK": "FLAG",
+    }
+    decision = decision_map[result["decision"]]
+    decision_class = {
+        "APPROVE": "decision-approve",
+        "MANUAL_REVIEW": "decision-review",
+        "FLAG": "decision-flag",
+    }[decision]
+    st.markdown(
+        f"""
+        <section class="risk-card">
+            <h3>Risk assessment</h3>
+            <p class="assessment-label">📊 Risk score</p>
+            <div class="risk-score">{result['model_prob']:.3f}</div>
+            <p class="assessment-label">🎯 Decision</p>
+            <div class="decision-badge {decision_class}">{escape(decision)}</div>
+            <p><strong>Calibrated probability:</strong> {result['model_prob']:.1%}</p>
+            <p><strong>Reason:</strong> {escape(result['reason'])}</p>
+            <p><strong>🔍 Top-3 explanation:</strong></p>
+            <p>{escape(narrative)}</p>
+            <small>Narration: {escape(narration_mode)}</small>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
