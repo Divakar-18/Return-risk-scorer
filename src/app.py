@@ -146,7 +146,7 @@ st.markdown(
         border-radius: 4px;
         color: var(--text) !important;
         font-size: 0.85rem;
-        font-weight: 500;
+        font-weight: 700;
         padding: 0.25rem 0.55rem;
     }
     .decision-approve { border-color: var(--approve); color: var(--approve) !important; }
@@ -160,7 +160,11 @@ st.markdown(
     .detail-label {
         color: var(--muted) !important;
         font-size: 0.85rem;
-        font-weight: 500;
+        font-weight: 400;
+    }
+    .detail-label.emphasis,
+    .detail-value.emphasis {
+        font-weight: 700;
     }
     </style>
     """,
@@ -225,9 +229,9 @@ if submitted:
             <div class="risk-score">{result['model_prob']:.3f}</div>
             <p class="assessment-label">Decision</p>
             <div class="decision-badge {decision_class}">{escape(decision)}</div>
-            <p><span class="detail-label">Calibrated probability:</span> {result['model_prob']:.1%}</p>
-            <p><span class="detail-label">Reason:</span> {escape(result['reason'])}</p>
-            <p><span class="detail-label">Top-3 explanation:</span></p>
+            <p><span class="detail-label">Calibrated probability:</span> <span class="detail-value emphasis">{result['model_prob']:.1%}</span></p>
+            <p><span class="detail-label emphasis">Reason:</span> {escape(result['reason'])}</p>
+            <p><span class="detail-label emphasis">Top-3 explanation:</span></p>
             <p>{escape(narrative)}</p>
             <small>Narration: {escape(narration_mode)}</small>
         </section>
