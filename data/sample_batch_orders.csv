@@ -1,0 +1,13 @@
+category,price,discount_pct,customer_past_orders,customer_past_return_rate,payment_method,delivery_days,days_to_purchase
+Apparel,2500,0.40,0,0.00,COD,8,0
+Electronics,899,0.10,4,0.08,Prepaid,3,5
+Footwear,1800,0.25,1,0.20,COD,7,1
+Home,4200,0.05,8,0.04,Prepaid,4,6
+Beauty,650,0.30,2,0.15,COD,5,2
+Apparel,3990,0.50,0,0.00,COD,11,1
+Electronics,1200,0.00,10,0.02,Prepaid,2,8
+Footwear,2750,0.35,3,0.33,Prepaid,9,0
+Home,950,0.20,1,0.00,COD,6,3
+Beauty,3200,0.15,6,0.18,Prepaid,5,4
+Apparel,1450,0.45,2,0.50,COD,10,0
+Electronics,5200,0.10,5,0.12,Prepaid,7,2

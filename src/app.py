@@ -22,6 +22,19 @@ from train_model import (  # noqa: E402
 
 OPTIMAL_THRESHOLD = 0.19
 DATASET_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "synthetic_orders.csv")
+SAMPLE_BATCH_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "data", "sample_batch_orders.csv"
+)
+BATCH_COLUMNS = [
+    "category",
+    "price",
+    "discount_pct",
+    "customer_past_orders",
+    "customer_past_return_rate",
+    "payment_method",
+    "delivery_days",
+    "days_to_purchase",
+]
 
 
 @st.cache_resource
@@ -64,6 +77,29 @@ def get_shap_features(calibrated_model, order: dict, feature_columns: list[str])
         )
         for index in top_indices
     ]
+
+
+def score_batch_orders(batch_df: pd.DataFrame, calibrated_model, feature_columns: list[str]):
+    missing_columns = [column for column in BATCH_COLUMNS if column not in batch_df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {', '.join(missing_columns)}")
+
+    results = []
+    for order_index, row in batch_df[BATCH_COLUMNS].iterrows():
+        order = row.to_dict()
+        order["is_size_sensitive"] = int(order["category"] in {"Apparel", "Footwear"})
+        order["region"] = "North"
+        result = evaluate_order_risk(order, calibrated_model, feature_columns)
+        decision = "APPROVE" if result["decision"] == "PASS_LOW_RISK" else "MANUAL_REVIEW"
+        results.append(
+            {
+                "order_index": order_index,
+                "risk_score": result["model_prob"],
+                "decision": decision,
+                "reason": result["reason"],
+            }
+        )
+    return pd.DataFrame(results)
 
 
 st.set_page_config(page_title="Return Risk Scorer", page_icon="R", layout="centered")
@@ -238,3 +274,37 @@ if submitted:
         """,
         unsafe_allow_html=True,
     )
+
+st.divider()
+st.header("Batch Scoring")
+st.write("Upload a CSV with the same order fields to score multiple orders at once.")
+sample_batch = pd.read_csv(SAMPLE_BATCH_PATH).to_csv(index=False).encode("utf-8")
+st.download_button(
+    "Download sample batch CSV",
+    data=sample_batch,
+    file_name="sample_batch_orders.csv",
+    mime="text/csv",
+)
+uploaded_batch = st.file_uploader(
+    "Upload batch orders CSV",
+    type="csv",
+    help="Required columns: " + ", ".join(BATCH_COLUMNS),
+)
+
+if uploaded_batch is not None:
+    try:
+        batch_orders = pd.read_csv(uploaded_batch)
+        with st.spinner("Scoring batch orders..."):
+            batch_model, batch_feature_columns = load_calibrated_pipeline()
+            batch_results = score_batch_orders(
+                batch_orders, batch_model, batch_feature_columns
+            )
+        st.dataframe(batch_results, use_container_width=True, hide_index=True)
+        st.download_button(
+            "Download results as CSV",
+            data=batch_results.to_csv(index=False).encode("utf-8"),
+            file_name="batch_scoring_results.csv",
+            mime="text/csv",
+        )
+    except (ValueError, TypeError) as batch_error:
+        st.error(f"Could not score batch: {batch_error}")
