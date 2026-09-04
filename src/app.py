@@ -22,6 +22,9 @@ from train_model import (  # noqa: E402
 
 OPTIMAL_THRESHOLD = 0.19
 DATASET_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "synthetic_orders.csv")
+ARCHITECTURE_DIAGRAM_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "data", "architecture_diagram.png"
+)
 SAMPLE_BATCH_PATH = os.path.join(
     os.path.dirname(__file__), "..", "data", "sample_batch_orders.csv"
 )
@@ -208,7 +211,7 @@ st.markdown(
 )
 st.title("Return Risk Scorer")
 st.caption(f"Calibrated model with cold-start protection | Threshold: {OPTIMAL_THRESHOLD:.2f}")
-st.image("data/architecture_diagram.png", use_container_width=True)
+st.image(ARCHITECTURE_DIAGRAM_PATH, use_container_width=True)
 
 with st.form("order_risk_form"):
     category = st.selectbox("Category", ["Apparel", "Beauty", "Electronics", "Footwear", "Home"])

@@ -1,8 +1,57 @@
-# Return-Risk Scorer — Razorpay AI Buildathon (Track: AI Risk Manager)
+# Return-Risk Scorer
 
-A rigorous, defensible, cost-sensitive machine learning MVP designed to score e-commerce return risk, calibrate probability outputs, optimize financial decision thresholds, explain high-risk flags in plain English, and enforce robust operational failure guards.
+**A practical return-risk decision tool for e-commerce merchants.**
+
+## About
+
+Return-Risk Scorer helps e-commerce merchants identify orders that are more likely to be returned before fulfillment, so teams can focus review and prevention effort where it matters. It turns order details and customer history into a calibrated risk probability and a clear operational recommendation. The approach is rigorous: it calibrates probabilities, uses cost-sensitive thresholds, explains each high-risk flag, and includes safeguards for cold-start orders and model drift. The Streamlit app provides both single-order analysis and batch CSV scoring for day-to-day merchant workflows.
 
 ![Return-risk scoring architecture](data/architecture_diagram.png)
+
+## Tech Stack
+
+![Python](https://img.shields.io/badge/Python-3.12-blue) ![LightGBM](https://img.shields.io/badge/LightGBM-Model-3f7f5f) ![scikit--learn](https://img.shields.io/badge/scikit--learn-Calibration-f7931e) ![SHAP](https://img.shields.io/badge/SHAP-Explainability-8e44ad) ![Streamlit](https://img.shields.io/badge/Streamlit-App-ff4b4b) ![Groq API](https://img.shields.io/badge/Groq_API-LLM-111827) ![pandas](https://img.shields.io/badge/pandas-Data-150458) ![pytest](https://img.shields.io/badge/pytest-Tests-0a9edc) ![ruff](https://img.shields.io/badge/ruff-Linting-d7ff64)
+
+## Key Results
+
+| Measure | Result |
+| --- | ---: |
+| Direct cost reduction from the optimized threshold | **20.3%** |
+| Brier score improvement after isotonic calibration | **38.6%** |
+| 5-fold time-series PR-AUC | **0.2867 ± 0.0359** |
+| Top-10 feature stability across seeds | **81.8%** Jaccard overlap |
+| Cold-start protection | **Fixed** with deterministic first-time COD manual review |
+
+## Requirements / Setup
+
+```bash
+python -m venv venv
+venv\Scripts\activate
+python -m pip install -r requirements.txt
+```
+
+Generate data and run the Streamlit app:
+
+```bash
+python src/generate_data.py
+streamlit run src/app.py
+```
+
+Run the test suite:
+
+```bash
+python -m pytest
+```
+
+## Live Demo
+
+Run locally with:
+
+```bash
+streamlit run src/app.py
+```
+
+![Streamlit app single-order result](data/app_screenshot.png)
 
 ---
 
