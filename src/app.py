@@ -71,81 +71,94 @@ st.markdown(
     """
     <style>
     :root {
-        --primary: #1769aa;
-        --danger: #c0392b;
-        --neutral: #263746;
+        --accent: #31566b;
+        --text: #2f3a40;
+        --muted: #707b82;
+        --line: #d9dee2;
+        --approve: #4f7d61;
+        --danger: #a55353;
     }
     [data-testid="stHeading"] h1,
     [data-testid="stHeading"] h2,
     [data-testid="stHeading"] h3 {
-        color: var(--primary);
+        color: var(--accent);
+        font-weight: 600;
     }
     [data-testid="stForm"] {
-        border: 1px solid var(--neutral);
-        border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(38, 55, 70, 0.12);
-        padding: 1.25rem 1.5rem 1rem;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 2rem 2rem 1.5rem;
     }
     [data-testid="stForm"] label {
-        color: var(--neutral);
+        color: var(--muted);
+        font-size: 0.88rem;
+    }
+    [data-testid="stForm"] [data-testid="stVerticalBlock"] {
+        gap: 1rem;
     }
     [data-testid="stForm"] button[kind="primary"] {
-        background: var(--primary);
-        border-color: var(--primary);
+        background: var(--accent);
+        border-color: var(--accent);
         color: #ffffff;
-        margin-top: 0.75rem;
+        margin-top: 1rem;
     }
     .risk-card {
-        border: 1px solid var(--neutral);
-        border-radius: 8px;
-        padding: 1.25rem 1.5rem;
-        margin-top: 1rem;
-        box-shadow: 0 2px 10px rgba(38, 55, 70, 0.12);
-        color: var(--neutral);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 2rem 2rem 1.75rem;
+        margin-top: 2rem;
+        color: var(--text);
     }
     .risk-card h3 {
-        margin: 0 0 1.25rem;
-        color: var(--primary);
-        font-size: 1.2rem;
+        margin: 0 0 2rem;
+        color: var(--accent);
+        font-size: 1.1rem;
+        font-weight: 600;
     }
     .risk-card p {
-        color: var(--neutral);
-        margin: 0.9rem 0 0;
+        color: var(--text);
+        font-weight: 400;
+        margin: 1.25rem 0 0;
     }
     .risk-card .risk-score + .assessment-label {
-        margin-top: 1.25rem;
+        margin-top: 1.75rem;
     }
     .risk-card .decision-badge + p {
-        margin-top: 1.25rem;
+        margin-top: 1.75rem;
     }
     .risk-card small {
-        color: var(--neutral);
+        color: var(--muted);
         display: block;
-        margin-top: 1.1rem;
-        opacity: 0.72;
+        font-size: 0.8rem;
+        margin-top: 1.5rem;
     }
     .risk-score {
-        color: var(--neutral);
-        font-size: 2rem;
+        color: var(--text);
+        font-size: 3.25rem;
         font-weight: 700;
-        line-height: 1.1;
+        line-height: 1;
+        margin-top: 0.5rem;
     }
     .decision-badge {
         display: inline-block;
-        border-radius: 5px;
-        color: #ffffff;
-        font-weight: 700;
-        padding: 0.35rem 0.65rem;
-        letter-spacing: 0.02em;
+        border: 1px solid;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        padding: 0.25rem 0.55rem;
     }
-    .decision-approve { background: var(--primary); }
-    .decision-review, .decision-flag { background: var(--danger); }
+    .decision-approve { border-color: var(--approve); color: var(--approve); }
+    .decision-review, .decision-flag { border-color: var(--danger); color: var(--danger); }
     .assessment-label {
-        color: var(--neutral);
+        color: var(--muted);
         font-size: 0.85rem;
         font-weight: 400;
         margin: 0;
-        opacity: 0.72;
+    }
+    .detail-label {
+        color: var(--muted);
+        font-size: 0.85rem;
+        font-weight: 500;
     }
     </style>
     """,
@@ -205,13 +218,13 @@ if submitted:
         f"""
         <section class="risk-card">
             <h3>Risk assessment</h3>
-            <p class="assessment-label">📊 Risk score</p>
+            <p class="assessment-label">Risk score</p>
             <div class="risk-score">{result['model_prob']:.3f}</div>
-            <p class="assessment-label">🎯 Decision</p>
+            <p class="assessment-label">Decision</p>
             <div class="decision-badge {decision_class}">{escape(decision)}</div>
-            <p><strong>Calibrated probability:</strong> {result['model_prob']:.1%}</p>
-            <p><strong>Reason:</strong> {escape(result['reason'])}</p>
-            <p><strong>🔍 Top-3 explanation:</strong></p>
+            <p><span class="detail-label">Calibrated probability:</span> {result['model_prob']:.1%}</p>
+            <p><span class="detail-label">Reason:</span> {escape(result['reason'])}</p>
+            <p><span class="detail-label">Top-3 explanation:</span></p>
             <p>{escape(narrative)}</p>
             <small>Narration: {escape(narration_mode)}</small>
         </section>
